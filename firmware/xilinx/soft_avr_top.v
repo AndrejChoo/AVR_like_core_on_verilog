@@ -1,23 +1,6 @@
 `timescale 1ns / 1ps
-//////////////////////////////////////////////////////////////////////////////////
-// Company: 
-// Engineer: 
-// 
-// Create Date:    14:18:10 09/19/2023 
-// Design Name: 
-// Module Name:    soft_avr_new 
-// Project Name: 
-// Target Devices: 
-// Tool versions: 
-// Description: 
-//
-// Dependencies: 
-//
-// Revision: 
-// Revision 0.01 - File Created
-// Additional Comments: 
-//
-//////////////////////////////////////////////////////////////////////////////////
+
+//`define ind7seg
 module soft_avr_top(
 
 	input wire clk,
@@ -39,8 +22,10 @@ module soft_avr_top(
 	//TIMER0
 	input wire t0,
 	//DEBUG
+`ifdef ind7seg
 	output wire[7:0]RAZR,
 	output wire[7:0]SEG,
+	`endif
 	input wire btn
 );
 
@@ -77,9 +62,9 @@ io mio0(.clk(hclk),.rst(rst),.SREG(SREG),.IOCNT(IOCNT),.IODIN(IODOUT),.IODOUT(IO
 			.sda(sda),.scl(scl),.t0(t0),
 			.IRQ_REQ(IRQ_REQ),.IRQ_ADD(IRQ_ADD));
 
-
+`ifdef ind7seg
 din7seg m7s(.clk(clk),.RAZR(RAZR),.SEG(SEG),.I0(PCNT[3:0]),.I1(PCNT[7:4]),.I2(PCNT[11:8]),.I3(PCNT[15:12]),
 				.I6(ONUM[3:0]),.I7(ONUM[6:4]),.I4(SREG[3:0]),.I5(SREG[7:4]));			
-
+`endif
 
 endmodule
