@@ -1,3 +1,5 @@
+//`define ind7seg
+
 module avr_top(
 	input wire clk,
 	input wire rst,
@@ -18,8 +20,10 @@ module avr_top(
 	//TIMER0
 	input wire t0,
 	//DEBUG
+`ifdef ind7seg
 	output wire[7:0]RAZR,
 	output wire[7:0]SEG,
+`endif
 	input wire btn
 );
 
@@ -61,10 +65,11 @@ io mio0(.clk(hclk),.rst(rst),.SREG(SREG),.IOCNT(IOCNT),.IODIN(IODOUT),.IODOUT(IO
 			.PB(PB),.PC(PC),.PD(PD),.SP(SP),.uart_rx(uart_rx_io),.uart_tx(uart_tx),.mosi(mosi),.miso(miso),.sck(sck),
 			.sda(sda),.scl(scl),.t0(t0),
 			.IRQ_REQ(IRQ_REQ),.IRQ_ADD(IRQ_ADD));
-			
+
+`ifdef ind7seg
 din7seg m7s(.clk(clk),.RAZR(RAZR),.SEG(SEG),.I0(PCNT[3:0]),.I1(PCNT[7:4]),.I2(PCNT[11:8]),.I3(PCNT[15:12]),
 				.I6(ONUM[3:0]),.I7(ONUM[6:4]),.I4(SREG[3:0]),.I5(SREG[7:4]));
-			
+`endif			
 
 endmodule
 
