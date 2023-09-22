@@ -13,10 +13,10 @@ output wire[15:0]SP,
 input wire IRQ_REQ,
 input wire[3:0]IRQ_ADD,
 //PROGGER
-//input wire[15:0]PROGDI,
-//input wire[ROM_ADD_WIDTH:0]PROGADD,
-//input wire PROG_CLK,
-//input wire PROG_WE,
+input wire[15:0]PROGDI,
+input wire[ROM_ADD_WIDTH:0]PROGADD,
+input wire PROG_CLK,
+input wire PROG_WE,
 //DEBUG
 output wire[15:0]PCNT,
 output wire[6:0]ONUM
@@ -24,7 +24,6 @@ output wire[6:0]ONUM
 
 `include "params.sv"
 
-reg[1:0]rst_cnt;
 reg state,state1;
 //Registr decodera opcodov
 reg[6:0] o_num;
@@ -55,28 +54,22 @@ reg ram_clk0, ram_clk1;
 reg ram_ck0, ram_ck1;
 
 
-always@(posedge clk or negedge rst)
-begin
-	if(!rst)rst_cnt <= 0;
-	else
-		begin
-			if(rst_cnt < 3) rst_cnt <= rst_cnt + 1;
-		end
-end
-
 //Wires
 wire hclk;
 wire[15:0]opcode0,opcode1;
 wire[ROM_ADD_WIDTH:0]rom_add1;
-wire rrd;
+wire rrd,rrd1,romwe;
 wire[7:0] RAM_DOUT0, RAM_DOUT1;
 //Two words command
 wire comm_width;
 
 //Assignations
-assign hclk = (rst_cnt == 3)? clk : 1'b0;
-assign rom_add1 = (PC + 1);
+assign hclk = clk;
+assign rom_add1 = (rst)? (PC + 1) : PROGADD;
 assign rrd = (state == 0)? ~(hclk & rst) : 1'b1;
+assign rrd1 = (rst)? rrd : PROG_CLK;
+assign romwe = (rst)? 1'b0 : PROG_WE;
+
 assign IOCNT = iocnt;
 assign IODOUT = iodout;
 assign SREG = sreg;
@@ -111,17 +104,18 @@ begin
 	else ram_ck1 <= 1;
 end
 
-
+/*
 ROM mr0(.q_a({opcode0[7:0],opcode0[15:8]}),.q_b({opcode1[7:0],opcode1[15:8]}),.address_a(PC),
 			.address_b(rom_add1),.clock_a(rrd),.clock_b(rrd));
-/*
-SROM mr1(.address_a(PC),.address_b(rom_add1),.clock_a(rrd),.clock_b(rrd1),.wren_a(1'b0),.wren_b(PROG_WE),
-			.data_a(16'hFF),.data_b(PROGDI),.q_a({opcode0[7:0],opcode0[15:8]}),.q_b({opcode1[7:0],opcode1[15:8]}));
 */
+SROM mr1(.address_a(PC),.address_b(rom_add1),.clock_a(rrd),.clock_b(rrd1),.wren_a(1'b0),.wren_b(romwe),
+			.data_a(16'hFF),.data_b(PROGDI),.q_a({opcode0[7:0],opcode0[15:8]}),.q_b({opcode1[7:0],opcode1[15:8]}));
+
 
 RAM ms0(.address_a(ram_add0[RAM_ADD_WIDTH:0]),.address_b(ram_add1[RAM_ADD_WIDTH:0]),.clock_a(~ram_ck0),.clock_b(~ram_ck1),
 			.wren_a(ram_we0),.wren_b(ram_we1),.data_a(ram_din0),.data_b(ram_din1),.q_a(RAM_DOUT0),.q_b(RAM_DOUT1));
 
+			
 //Logika mashinnogo tcikla
 always@(negedge hclk or negedge rst)
 begin

@@ -347,8 +347,8 @@ begin
 end
 
 //--------------------------------UART-----------------------------------
-reg[7:0]udr_tx, udr_rx, udr_tmp;
-reg[14:0]ubrr, utx_counter, urx_counter;
+reg[7:0]udr_tx, udr_rx;
+reg[14:0]ubrr, utx_counter;
 reg uart_txen, uart_rxen, uart_txc, uart_rxc, uart_udrie, uart_txcie, uart_rxcie;
 reg[3:0]utx_state;
 reg utx, utrdy;
@@ -497,9 +497,7 @@ always@(posedge utx_clk or negedge rst)
 assign uart_tx = ~utx;
 
 //UART RX
-reg[3:0]urx_state;
 reg urrdy;
-
 wire urxc_rst;
 assign urxc_rst = (IOCNT == aUDR)? ~IOR : 1'b1;
 
@@ -510,126 +508,126 @@ begin
     else uart_rxc <= 1;
 end
 
-always@(posedge urx_clk or negedge rst)
-begin
-    if(!rst)
-        begin
-            udr_rx <= 0;
-            udr_tmp <= 0;
-            urrdy <= 0;
-            urx_counter <= 0;
-            urx_state <= 0;
-        end
-    else
-        begin
-            if(urx_counter > 0) urx_counter <= urx_counter - 1;
-            case(urx_state)
-                0: //IDDLE
-                    begin
-                        urrdy <= 0;
-                        if(!uart_rx)
-                            begin
-                                urx_counter <= ubrr;
-                                urx_state <= 1;
-                            end
-                    end
-                1: //START
-                    begin
-                        urrdy <= 1;
-                        if(urx_counter == 0)
-                            begin
-                                urx_counter <= ubrr;
-                                urx_state <= 2;
-                            end
-                    end
-                2: //Bit0
-                    begin
-                        if(urx_counter == ubrr[14:1]) udr_tmp[0] <= uart_rx;
-                        if(urx_counter == 0)
-                            begin
-                                urx_counter <= ubrr;
-                                urx_state <= 3;
-                            end
-                    end
-                3: //Bit1
-                    begin
-                        if(urx_counter == ubrr[14:1]) udr_tmp[1] <= uart_rx;
-                        if(urx_counter == 0)
-                            begin
-                                urx_counter <= ubrr;
-                                urx_state <= 4;
-                            end
-                    end
-                4: //Bit2
-                    begin
-                        if(urx_counter == ubrr[14:1]) udr_tmp[2] <= uart_rx;
-                        if(urx_counter == 0)
-                            begin
-                                urx_counter <= ubrr;
-                                urx_state <= 5;
-                            end
-                    end
-                5: //Bit3
-                    begin
-                        if(urx_counter == ubrr[14:1]) udr_tmp[3] <= uart_rx;
-                        if(urx_counter == 0)
-                            begin
-                                urx_counter <= ubrr;
-                                urx_state <= 6;
-                            end
-                    end
-                6: //Bit4
-                    begin
-                        if(urx_counter == ubrr[14:1]) udr_tmp[4] <= uart_rx;
-                        if(urx_counter == 0)
-                            begin
-                                urx_counter <= ubrr;
-                                urx_state <= 7;
-                            end
-                    end
-                7: //Bit5
-                    begin
-                        if(urx_counter == ubrr[14:1]) udr_tmp[5] <= uart_rx;
-                        if(urx_counter == 0)
-                            begin
-                                urx_counter <= ubrr;
-                                urx_state <= 8;
-                            end
-                    end
-                8: //Bit6
-                    begin
-                        if(urx_counter == ubrr[14:1]) udr_tmp[6] <= uart_rx;
-                        if(urx_counter == 0)
-                            begin
-                                urx_counter <= ubrr;
-                                urx_state <= 9;
-                            end
-                    end
-                9: //Bit7
-                    begin
-                        if(urx_counter == ubrr[14:1]) udr_tmp[7] <= uart_rx;
-                        if(urx_counter == 0)
-                            begin
-                                urx_counter <= ubrr;
-                                urx_state <= 10;
-                            end
-                    end
-                10: //STOP
-                    begin
-                        if(urx_counter == 0)
-                            begin
-                                urx_state <= 11;
-                            end
-                    end
-                11: //Bit1
-                    begin
-                        urx_state <= 0;
-                        urrdy <= 0;
-                        udr_rx <= udr_tmp;
-                    end
-            endcase
-        end
-end
+ parameter s_IDLE         = 3'b000;
+  parameter s_RX_START_BIT = 3'b001;
+  parameter s_RX_DATA_BITS = 3'b010;
+  parameter s_RX_STOP_BIT  = 3'b011;
+  parameter s_CLEANUP      = 3'b100;
+   
+  reg           r_Rx_Data_R = 1'b1;
+  reg           r_Rx_Data   = 1'b1;
+   
+  reg [14:0]    r_Clock_Count = 0;
+  reg [2:0]     r_Bit_Index   = 0; 
+  reg [7:0]     r_Rx_Byte     = 0;
+  reg [2:0]     r_SM_Main     = 0;
+   
+
+  always @(posedge clk)
+    begin
+      r_Rx_Data_R <= uart_rx;
+      r_Rx_Data   <= r_Rx_Data_R;
+    end
+   
+   
+  // Purpose: Control RX state machine
+  always @(posedge clk)
+    begin
+       
+      case (r_SM_Main)
+        s_IDLE :
+          begin
+            urrdy       <= 1'b0;
+            r_Clock_Count <= 0;
+            r_Bit_Index   <= 0;
+             
+            if (r_Rx_Data == 1'b0)          // Start bit detected
+              r_SM_Main <= s_RX_START_BIT;
+            else
+              r_SM_Main <= s_IDLE;
+          end
+         
+        // Check middle of start bit to make sure it's still low
+        s_RX_START_BIT :
+          begin
+				urrdy       <= 1'b1;
+            if (r_Clock_Count == (ubrr-1)/2)
+              begin
+                if (r_Rx_Data == 1'b0)
+                  begin
+                    r_Clock_Count <= 0;  // reset counter, found the middle
+                    r_SM_Main     <= s_RX_DATA_BITS;
+                  end
+                else
+                  r_SM_Main <= s_IDLE;
+              end
+            else
+              begin
+                r_Clock_Count <= r_Clock_Count + 1;
+                r_SM_Main     <= s_RX_START_BIT;
+              end
+          end // case: s_RX_START_BIT
+         
+         
+        // Wait CLKS_PER_BIT-1 clock cycles to sample serial data
+        s_RX_DATA_BITS :
+          begin
+            if (r_Clock_Count < ubrr-1)
+              begin
+                r_Clock_Count <= r_Clock_Count + 1;
+                r_SM_Main     <= s_RX_DATA_BITS;
+              end
+            else
+              begin
+                r_Clock_Count          <= 0;
+                r_Rx_Byte[r_Bit_Index] <= r_Rx_Data;
+                 
+                // Check if we have received all bits
+                if (r_Bit_Index < 7)
+                  begin
+                    r_Bit_Index <= r_Bit_Index + 1;
+                    r_SM_Main   <= s_RX_DATA_BITS;
+                  end
+                else
+                  begin
+                    r_Bit_Index <= 0;
+                    r_SM_Main   <= s_RX_STOP_BIT;
+                  end
+              end
+          end // case: s_RX_DATA_BITS
+     
+     
+        // Receive Stop bit.  Stop bit = 1
+        s_RX_STOP_BIT :
+          begin
+            // Wait CLKS_PER_BIT-1 clock cycles for Stop bit to finish
+				udr_rx <= r_Rx_Byte;
+            if (r_Clock_Count < ubrr-1)
+              begin
+                r_Clock_Count <= r_Clock_Count + 1;
+                r_SM_Main     <= s_RX_STOP_BIT;
+              end
+            else
+              begin
+                r_Clock_Count <= 0;
+                r_SM_Main     <= s_CLEANUP;
+              end
+          end // case: s_RX_STOP_BIT
+     
+         
+        // Stay here 1 clock
+        s_CLEANUP :
+          begin
+            r_SM_Main <= s_IDLE;
+            urrdy   <= 1'b0;
+          end
+         
+         
+        default :
+          r_SM_Main <= s_IDLE;
+         
+      endcase
+    end
 
 //----------------------------------SPI--------------------------------------
 //SPCR -> SPIE : SPE : DORD : MSTR : CPOL : CPHA : SPR1 : SPR0
