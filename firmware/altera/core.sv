@@ -1091,7 +1091,7 @@ begin
 				ADIW: 	RALU16 = {r[{2'b11, opcode0[5:4], 1'b1}],r[{2'b11, opcode0[5:4], 1'b0}]} + {opcode0[7:6],opcode0[3:0]};
 				AND: 		RALU = r[(opcode0[8:4])] & r[{opcode0[9],opcode0[3:0]}];
 				ANDI: 	RALU = r[{1'b1, opcode0[7:4]}] & {opcode0[11:8],opcode0[3:0]}; 
-				ASR: 		RALU = {r[(opcode0[8:4])][7],r[(opcode0[8:4])][6:1]};
+				ASR: 		RALU = {r[(opcode0[8:4])][7],r[(opcode0[8:4])][7:1]};
 				CPI:  	begin RALU = r[{1'b1, opcode0[7:4]}] - {opcode0[11:8],opcode0[3:0]}; operand = {opcode0[11:8],opcode0[3:0]}; end
 				COM: 		RALU = 8'hFF - r[(opcode0[8:4])];
 				CPSE: 	RALU = r[(opcode0[8:4])] - r[{opcode0[9], opcode0[3:0]}];
