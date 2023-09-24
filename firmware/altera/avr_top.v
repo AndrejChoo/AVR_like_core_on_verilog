@@ -4,6 +4,7 @@ module avr_new(
 	input wire clk,
 	input wire rst,
 	//GPIO
+	inout wire[7:0]PA,
 	inout wire[7:0]PB,
 	inout wire[7:0]PC,
 	inout wire[7:0]PD,
@@ -68,7 +69,7 @@ progger mpr(.clk(clk),.rst(rst),.rx(uart_rx_prog),.DOUT(PROGDATA),.PADD(PROGADD)
 				
 
 io mio0(.clk(hclk),.rst(rst),.SREG(SREG),.IOCNT(IOCNT),.IODIN(IODOUT),.IODOUT(IODIN),.IOW(IOW),.IOR(IOR),
-			.PB(PB),.PC(PC),.PD(PD),.SP(SP),.uart_rx(uart_rx_io),.uart_tx(uart_tx),.mosi(mosi),.miso(miso),.sck(sck),
+	.PA(PA),.PB(PB),.PC(PC),.PD(PD),.SP(SP),.uart_rx(uart_rx_io),.uart_tx(uart_tx),.mosi(mosi),.miso(miso),.sck(sck),
 	.sda(sda),.scl(scl),.t0(t0),.t2_oc(t2_oc),
 			.IRQ_REQ(IRQ_REQ),.IRQ_ADD(IRQ_ADD));
 `ifdef ind7seg			
