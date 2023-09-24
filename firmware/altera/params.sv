@@ -132,6 +132,7 @@ localparam	SPH	= 8'h3E;
 `define c_cpse
 `define c_dec
 `define c_eor
+//`define c_fmul
 `define c_icall
 `define c_ijmp
 `define c_in
