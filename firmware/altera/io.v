@@ -11,8 +11,9 @@ input wire IOW,
 input wire IOR,
 //INTERRUPTS
 output wire IRQ_REQ,
-output wire[3:0]IRQ_ADD,
+output wire[5:0]IRQ_ADD,
 //GPIO
+inout wire[7:0]PA,
 inout wire[7:0]PB,
 inout wire[7:0]PC,
 inout wire[7:0]PD,
@@ -27,48 +28,60 @@ input wire miso,
 inout sda,
 inout scl,
 //TIMER0
-input wire t0
+input wire t0,
+//TIMER2
+output wire t2_oc
 //DEBUG
 
 );
 
 `include "params.sv"
 
-//Register map like Atmega8
+//Register map like Atmega8/Atmega16/Atmega32
 localparam aSREG = 8'h3F;
 localparam aSPH = 8'h3E;
 localparam aSPL = 8'h3D;	
 localparam aGICR = 8'h3B;
 localparam aGIFR = 8'h3A;
+localparam aTIMSK = 8'h39;
+localparam aTIFR = 8'h38;
 localparam aTWCR = 8'h36;
 localparam aMCUCR = 8'h35;
-localparam aTWBR = 8'h00;
-localparam aTWSR = 8'h01;
-localparam aTWAR = 8'h02;
-localparam aTWDR = 8'h03;
-localparam aUBRRH = 8'h20;
-localparam aUBRRL = 8'h09;
-localparam aUCSRB = 8'h0A;
-localparam aUCSRA = 8'h0B;
-localparam aUDR = 8'h0C;
-localparam aSPCR = 8'h0D;
-localparam aSPSR = 8'h0E;
-localparam aSPDR = 8'h0F;
-localparam aPIND = 8'h10;
-localparam aDDRD = 8'h11;
-localparam aPORTD = 8'h12;
-localparam aPINC = 8'h13;
-localparam aDDRC = 8'h14;
-localparam aPORTC = 8'h15;
-localparam aPINB = 8'h16;
-localparam aDDRB = 8'h17;
-localparam aPORTB = 8'h18;
-localparam aTCNT0 = 8'h32;
 localparam aTCCR0 = 8'h33;
-localparam aTIFR = 8'h38;
-localparam aTIMSK = 8'h39;
-
+localparam aTCNT0 = 8'h32;
+localparam aTCCR2 = 8'h25;
+localparam aTCNT2 = 8'h24;
+localparam aOCR2 = 8'h23;
+localparam aUBRRH = 8'h20;
+//PORTA Atmega16
+localparam aPORTA = 8'h1B;
+localparam aDDRA = 8'h1A;
+localparam aPINA = 8'h19;
+//
+localparam aPORTB = 8'h18;
+localparam aDDRB = 8'h17;
+localparam aPINB = 8'h16;
+localparam aPORTC = 8'h15;
+localparam aDDRC = 8'h14;
+localparam aPINC = 8'h13;
+localparam aPORTD = 8'h12;
+localparam aDDRD = 8'h11;
+localparam aPIND = 8'h10;
+localparam aSPDR = 8'h0F;
+localparam aSPSR = 8'h0E;
+localparam aSPCR = 8'h0D;
+localparam aUDR = 8'h0C;
+localparam aUCSRA = 8'h0B;
+localparam aUCSRB = 8'h0A;
+localparam aUBRRL = 8'h09;
+localparam aTWDR = 8'h03;
+localparam aTWAR = 8'h02;
+localparam aTWSR = 8'h01;
+localparam aTWBR = 8'h00;
 //------------------------------INTERRUPTS-------------------------------
+
+`define ATMEGA16_32
+//`define ATMEGA8
 
 /*
 Vector No. | Program Address | Source Interrupt Definition
@@ -97,7 +110,7 @@ Vector No. | Program Address | Source Interrupt Definition
 
 `ifdef irq_enable
 wire[12:0]irq_source;
-reg[3:0]irq_vect;
+reg[5:0]irq_vect;
 
 assign IRQ_REQ = SREG[7] & (irq_source[0] | irq_source[1] | irq_source[2] | irq_source[3] | irq_source[4] | 
                     irq_source[5] | irq_source[6] | irq_source[7] | irq_source[8] | irq_source[9] | irq_source[10] |
@@ -105,14 +118,14 @@ assign IRQ_REQ = SREG[7] & (irq_source[0] | irq_source[1] | irq_source[2] | irq_
 
 assign IRQ_ADD = irq_vect;
 
-
+`ifdef ATMEGA8
 always@(irq_source)
 begin
     if(irq_source[0] == 1) irq_vect <= 1;    
     else if(irq_source[1:0] == 2'b10) irq_vect <= 2;
     else if(irq_source[2:0] == 3'b100) irq_vect <= 3;
-    else if(irq_source[3:0] == 4'b1000) irq_vect <= 4;
-    else if(irq_source[4:0] == 5'b10000) irq_vect <= 5;
+    else if(irq_source[3:0] == 4'b1000) irq_vect <= 3;
+    else if(irq_source[4:0] == 5'b10000) irq_vect <= 4;
     else if(irq_source[5:0] == 6'b100000) irq_vect <= 6;
     else if(irq_source[6:0] == 7'b1000000) irq_vect <= 7;
     else if(irq_source[7:0] == 8'b10000000) irq_vect <= 8;
@@ -122,6 +135,26 @@ begin
     else if(irq_source[11:0] == 12'b100000000000) irq_vect <= 12;
     else if(irq_source[12:0] == 13'b1000000000000) irq_vect <= 13;
 end
+`endif
+
+`ifdef ATMEGA16_32
+always@(irq_source)
+begin
+    if(irq_source[0] == 1) irq_vect <= 2; //INT0 
+    else if(irq_source[1:0] ==  2'b10) irq_vect <= 4; //INT1
+    else if(irq_source[2:0] ==  3'b100) irq_vect <= 6; //INT2
+    else if(irq_source[3:0] ==  4'b1000) irq_vect <= 8; //TIMER2 COMP
+    else if(irq_source[4:0] ==  5'b10000) irq_vect <= 10; //TIMER2 OVF
+    else if(irq_source[5:0] ==  6'b100000) irq_vect <= 12; 
+    else if(irq_source[6:0] ==  7'b1000000) irq_vect <= 14;
+    else if(irq_source[7:0] ==  8'b10000000) irq_vect <= 16;
+    else if(irq_source[8:0] ==  9'b100000000) irq_vect <= 22; //TIMER0 OVF
+    else if(irq_source[9:0] ==  10'b1000000000) irq_vect <= 20;
+    else if(irq_source[10:0] == 11'b10000000000) irq_vect <= 28; //UART RXC
+    else if(irq_source[11:0] == 12'b100000000000) irq_vect <= 24;
+    else if(irq_source[12:0] == 13'b1000000000000) irq_vect <= 26;
+end
+`endif
 
 //INT0 (PD2 vector 1)
 assign irq_source[0] = intf0 & int10[0] & SREG[7];
@@ -130,8 +163,10 @@ assign irq_source[0] = intf0 & int10[0] & SREG[7];
 assign irq_source[1] = intf1 & int10[1] & SREG[7];
 
 assign irq_source[2] = 0;
-assign irq_source[3] = 0;
-assign irq_source[4] = 0;
+assign irq_source[3] = oc2 & ocie2 & SREG[7];
+//TIM2 COMP
+assign irq_source[4] = tov2 & toie2 & SREG[7];
+//TIM2 OVF
 assign irq_source[5] = 0;
 assign irq_source[6] = 0;
 assign irq_source[7] = 0;
@@ -151,11 +186,11 @@ assign irq_source[12] = 0;
 //----------------------------------GPIO---------------------------------
 
 //WIRES
-wire[7:0]PBI,PCI,PDI;
+wire[7:0]PAI,PBI,PCI,PDI;
 //GENERAL
 reg[7:0]mcucr;
 //GPIO Registers
-reg[7:0]portb,portc,portd,ddrb,ddrc,ddrd;
+reg[7:0]porta,portb,portc,portd,ddra,ddrb,ddrc,ddrd;
 reg[1:0]int10;
 
 
@@ -166,9 +201,11 @@ always@(posedge IOW or negedge rst)
 begin
 	if(!rst)
 		begin
+			porta <= 0;
 			portb <= 0;
 			portc <= 0;
 			portd <= 0;
+			ddra <= 0;
 			ddrb <= 0;
 			ddrc <= 0;
 			ddrd <= 0;
@@ -176,17 +213,24 @@ begin
 			uart_rxen <= 0;
 			uart_txen <= 0;
 			ubrr <= 0;
-            spdr_w <= 0;
-            spcr <= 0;
-            spsr <= 0;
-            int10 <= 0;
-            mcucr <= 0;
-            tccr0 <= 0;
-            toie0 <= 0;
-            twbr <= 0;
-            twen <= 0;
-            twie <= 0;
-            twdr_w <= 0;
+         spdr_w <= 0;
+         spcr <= 0;
+         spsr <= 0;
+         int10 <= 0;
+         mcucr <= 0;
+         tccr0 <= 0;
+         toie0 <= 0;
+			toie2 <= 0;
+			ocie0 <= 0;
+			ocie2 <= 0;
+         twbr <= 0;
+         twen <= 0;
+         twie <= 0;
+         twdr_w <= 0;
+			ocr2 <= 0;
+			cs2 <= 0;
+			wgm2 <= 0;
+			com2 <= 0;
 		end
 	else
 		begin
@@ -194,9 +238,11 @@ begin
                 //GENERAL
                 aMCUCR: mcucr <= IODIN;
 				//GPIO
+				aPORTA: porta <= IODIN;
 				aPORTB: portb <= IODIN;
 				aPORTC: portc <= IODIN;
 				aPORTD: portd <= IODIN;
+				aDDRA:  ddra <= IODIN;
 				aDDRB:  ddrb <= IODIN;
 				aDDRC:  ddrc <= IODIN;
 				aDDRD:  ddrd <= IODIN;
@@ -215,8 +261,11 @@ begin
             aSPCR: spcr   <= IODIN;
             aSPSR: spsr[5:0] <= IODIN[5:0];
             //TIMER0
-            aTIMSK: toie0 <= IODIN[0];
+            aTIMSK: {ocie2,toie2,ocie0,toie0} <= {IODIN[7:6],IODIN[1:0]};
             aTCCR0: tccr0 <= IODIN[2:0];
+				//TIMER2
+				aTCCR2: {wgm2[0],com2[1:0],wgm2[1],cs2[2:0]} <= IODIN[6:0];
+				aOCR2:  ocr2 <= IODIN;
             //I2C
             aTWBR: twbr <= IODIN;
             aTWCR: {twea,twista,twisto,twen,twie} <= {IODIN[6:4],IODIN[2],IODIN[0]};
@@ -245,6 +294,7 @@ begin
 				aPORTB: IODOUT <= portb;
 				aPORTC: IODOUT <= portc;
 				aPORTD: IODOUT <= portd;
+				aPINA:  IODOUT <= PAI;
 				aPINB:  IODOUT <= PBI;
 				aPINC:  IODOUT <= PCI;
 				aPIND:  IODOUT <= PDI;
@@ -259,8 +309,12 @@ begin
             //TIMER0
             aTCCR0: IODOUT <= {5'b00000,tccr0[2:0]};
             aTCNT0: IODOUT <= tcnt0;
-            aTIFR:  IODOUT <= {7'b0000000, tov0};
-            aTIMSK: IODOUT <= {7'b0000000, toie0};
+            aTIFR:  IODOUT <= {1'b0,tov2,5'b00000, tov0};
+            aTIMSK: IODOUT <= {ocie2,toie2,4'b0000,ocie0, toie0};
+				//TIMER2
+				aTCNT2: IODOUT <= tcnt2;
+				aTCCR2: IODOUT <= {1'b0,wgm2[0],com2[1:0],wgm2[1],cs2[2:0]};
+				aOCR2:  IODOUT <= ocr2;
             //I2C
             aTWBR: IODOUT <= twbr;
             aTWCR: IODOUT <= {~twrdy,twea,twista,twisto,1'b0,twen,~tw_ack,twie};
@@ -271,6 +325,15 @@ begin
 end
 
 //----------------------------------GPIO--------------------------------
+
+assign PA[0] = (ddra[0] == 1)? porta[0] : 1'bZ;
+assign PA[1] = (ddra[1] == 1)? porta[1] : 1'bZ;
+assign PA[2] = (ddra[2] == 1)? porta[2] : 1'bZ;
+assign PA[3] = (ddra[3] == 1)? porta[3] : 1'bZ;
+assign PA[4] = (ddra[4] == 1)? porta[4] : 1'bZ;
+assign PA[5] = (ddra[5] == 1)? porta[5] : 1'bZ;
+assign PA[6] = (ddra[6] == 1)? porta[6] : 1'bZ;
+assign PA[7] = (ddra[7] == 1)? porta[7] : 1'bZ;
 
 assign PB[0] = (ddrb[0] == 1)? portb[0] : 1'bZ;
 assign PB[1] = (ddrb[1] == 1)? portb[1] : 1'bZ;
@@ -298,6 +361,15 @@ assign PD[4] = (ddrd[4] == 1)? portd[4] : 1'bZ;
 assign PD[5] = (ddrd[5] == 1)? portd[5] : 1'bZ;
 assign PD[6] = (ddrd[6] == 1)? portd[6] : 1'bZ;
 assign PD[7] = (ddrd[7] == 1)? portd[7] : 1'bZ;
+
+assign PAI[0] = (ddra[0] == 1)? 1'b0 : PA[0];
+assign PAI[1] = (ddra[1] == 1)? 1'b0 : PA[1];
+assign PAI[2] = (ddra[2] == 1)? 1'b0 : PA[2];
+assign PAI[3] = (ddra[3] == 1)? 1'b0 : PA[3];
+assign PAI[4] = (ddra[4] == 1)? 1'b0 : PA[4];
+assign PAI[5] = (ddra[5] == 1)? 1'b0 : PA[5];
+assign PAI[6] = (ddra[6] == 1)? 1'b0 : PA[6];
+assign PAI[7] = (ddra[7] == 1)? 1'b0 : PA[7];
 
 assign PBI[0] = (ddrb[0] == 1)? 1'b0 : PB[0];
 assign PBI[1] = (ddrb[1] == 1)? 1'b0 : PB[1];
@@ -857,18 +929,19 @@ assign sck = (spcr[3])? ~spi_sck : spi_sck;
 reg[7:0]tcnt0;
 reg[2:0]tccr0;
 reg[9:0]t0_del, t0_psc;
-reg toie0,tov0;
+reg toie0,ocie0,tov0;
 
 wire tc0_clk;
 wire tc0_extclk;
 wire preload;
-wire tov0_rst;
+wire tov0_rst, tov0_set;
 assign tc0_clk = (tccr0[2:1] == 3)? tc0_extclk : (clk & (tccr0[0]|tccr0[1]|tccr0[2]));
 assign tc0_extclk = (tccr0[0])? t0 : ~t0;
 assign preload = (IOCNT == aTCNT0)? IOW : 0;
-assign tov0_rst = (IOCNT == aTIFR)? ~(IOW & IODIN[0]) : 1;
+assign tov0_rst = (IOCNT == aTIFR)? ~IODIN[0] : 1;
+assign tov0_set = (tcnt0 == 255)? 1 : 0;
 
-always@(negedge tcnt0[7] or negedge (tov0_rst))
+always@(posedge tov0_set or negedge (tov0_rst))
 begin
     if(!(tov0_rst)) tov0 <= 0;
     else tov0 <= 1;
@@ -910,6 +983,124 @@ begin
 		end
 end
 
+//----------------------------------TIMER2------------------------------------
+reg[7:0]tcnt2,ocr2;
+reg[2:0]cs2;
+reg[1:0]wgm2,com2;
+reg[9:0]t2_del, t2_psc;
+reg toie2,ocie2,tov2,oc2,ocp2;
+
+wire tc2_clk;
+wire preload2;
+wire tov2_rst,tov2_set,oc2_rst,oc2_set;
+
+always@(cs2)
+begin
+	case(cs2)
+		1: t2_psc <= 0;
+		2: t2_psc <= 7;
+		3: t2_psc <= 31;
+		4: t2_psc <= 63;
+		5: t2_psc <= 127;
+		6: t2_psc <= 255;
+		7: t2_psc <= 1023;
+		default: t2_psc <= 0;
+	endcase
+end
+
+assign tc2_clk = (clk & (cs2[0]|cs2[1]|cs2[2]));
+assign preload2 = (IOCNT == aTCNT2)? IOW : 0;
+assign t2_oc = ocp2;
+assign tov2_rst = (IOCNT == aTIFR)? ~IODIN[6] : 1;
+assign tov2_set = (tcnt2 == 255)? 1 : 0;
+assign oc2_rst = (IOCNT == aTIFR)? ~IODIN[7] : 1;
+assign oc2_set = (tcnt2 == ocr2)? 1 : 0;
+
+always@(posedge tov2_set or negedge (tov2_rst))
+begin
+    if(!(tov2_rst)) tov2 <= 0;
+    else tov2 <= 1;
+end
+
+always@(posedge oc2_set or negedge oc2_rst)
+begin
+    if(!(oc2_rst)) oc2 <= 0;
+    else oc2 <= 1;
+end
+
+
+always@(posedge tc2_clk or negedge rst)
+begin
+	if(!rst)
+		begin
+			tcnt2 <= 0;
+			ocp2 <= 0;
+		end
+	else
+		begin
+			if(t2_del > 0) t2_del <= t2_del - 1;
+			case(com2)
+				2'b00:
+					begin
+						ocp2 <= 0;
+					end
+				2'b01:
+					begin
+						if(tcnt2 == ocr2) ocp2 <= ~ocp2;
+					end
+				2'b10:
+					begin
+						if(tcnt2 >= ocr2) ocp2 <= 0;
+						else ocp2 <= 1;
+					end
+				2'b11:
+					begin
+						if(tcnt2 >= ocr2) ocp2 <= 0;
+						else ocp2 <= 1;
+					end
+			endcase
+			
+			case(wgm2)
+				2'b00: //NORMAL MODE
+					begin
+						if(preload2) 
+							begin
+								tcnt2 <= IODIN;
+								t2_del <= t2_psc;
+							end
+						else
+							begin
+								if(t2_del == 0) 
+									begin
+										tcnt2 <= tcnt2 + 1;
+										t2_del <= t2_psc;
+									end
+							end
+					end
+				2'b01: //PWM Phase Correct
+					begin
+					
+					end
+				2'b10: //CTC
+					begin
+						if(t2_del == 0) 
+							begin
+								tcnt2 <= tcnt2 + 1;
+								t2_del <= t2_psc;
+								if(tcnt2 == ocr2) tcnt2 <= 0;
+							end					
+					end
+				2'b11: //Fast PWM
+					begin
+						if(t2_del == 0) 
+							begin
+								tcnt2 <= tcnt2 + 1;
+								t2_del <= t2_psc;
+							end
+					end
+			endcase
+		end
+end
 
 //---------------------------------I2C------------------------------------
 reg twen,twie,twea,twista,twisto;
