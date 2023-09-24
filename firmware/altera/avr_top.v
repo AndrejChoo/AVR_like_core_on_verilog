@@ -19,6 +19,8 @@ module avr_new(
 	inout scl,	
 	//TIMER0
 	input wire t0,
+	//TIMER2
+	output wire t2_oc,
 	//DEBUG
 `ifdef ind7seg
 	output wire[7:0]RAZR,
@@ -67,7 +69,7 @@ progger mpr(.clk(clk),.rst(rst),.rx(uart_rx_prog),.DOUT(PROGDATA),.PADD(PROGADD)
 
 io mio0(.clk(hclk),.rst(rst),.SREG(SREG),.IOCNT(IOCNT),.IODIN(IODOUT),.IODOUT(IODIN),.IOW(IOW),.IOR(IOR),
 			.PB(PB),.PC(PC),.PD(PD),.SP(SP),.uart_rx(uart_rx_io),.uart_tx(uart_tx),.mosi(mosi),.miso(miso),.sck(sck),
-			.sda(sda),.scl(scl),.t0(t0),
+	.sda(sda),.scl(scl),.t0(t0),.t2_oc(t2_oc),
 			.IRQ_REQ(IRQ_REQ),.IRQ_ADD(IRQ_ADD));
 `ifdef ind7seg			
 din7seg m7s(.clk(clk),.RAZR(RAZR),.SEG(SEG),.I0(PCNT[3:0]),.I1(PCNT[7:4]),.I2(PCNT[11:8]),.I3(PCNT[15:12]),
