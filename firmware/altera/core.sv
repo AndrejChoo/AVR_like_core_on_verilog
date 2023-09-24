@@ -11,7 +11,7 @@ output wire[7:0]SREG,
 output wire[15:0]SP,
 //INTERRUPTS
 input wire IRQ_REQ,
-input wire[3:0]IRQ_ADD,
+input wire[5:0]IRQ_ADD,
 //PROGGER
 input wire[15:0]PROGDI,
 input wire[ROM_ADD_WIDTH:0]PROGADD,
@@ -454,6 +454,17 @@ begin
 									sreg[SREG_S] <= 1'b0 ^ RALU[7];									
 									PC <= PC + 1;
 								end
+`endif
+`ifdef c_fmul
+							FMUL:
+								begin
+									r[1] <= RALU17[15:8];
+									r[0] <= RALU17[7:0];
+									sreg[SREG_C] <= RALU17[16];
+									sreg[SREG_Z] <= (RALU17[15:0] == 16'h0000)? 1'b1 : 1'b0;
+									PC <= PC + 1;
+								end
+
 `endif
 `ifdef c_icall								
 							ICALL:
@@ -978,7 +989,10 @@ always@(*)
 					if(opcode0[11:10] == 2'b10) o_num = SBC;
 					if(opcode0[11:8] == 4'b0001) o_num = MOVW;
 					if(opcode0[11:8] == 4'b0010) o_num = MULS;
-					if(opcode0[11:8] == 4'b0011) o_num = MULSU;
+					if({opcode0[11:7],opcode0[3]} == 6'b001100) o_num = MULSU;
+					if({opcode0[11:7],opcode0[3]} == 6'b001101) o_num = FMUL;
+					if({opcode0[11:7],opcode0[3]} == 6'b001110) o_num = FMULS;
+					if({opcode0[11:7],opcode0[3]} == 6'b001111) o_num = FMULSU;
 				end
 			4'h1:
 				begin
@@ -1099,9 +1113,9 @@ begin
 				EOR: 		RALU = r[(opcode0[8:4])] ^ r[{opcode0[9],opcode0[3:0]}];
 				INC: 		RALU = r[(opcode0[8:4])] + 1'b1;
 				LSR: 		RALU =  {1'b0, r[(opcode0[8:4])][7:1]};
-				MUL:  	RALU16 = r[(opcode0[8:4])]*r[{opcode0[9], opcode0[3:0]}];
+				MUL:  	RALU16 = $unsigned(r[(opcode0[8:4])]) * $unsigned(r[{opcode0[9], opcode0[3:0]}]);
 				MULS: 	RALU16 = $signed(r[{1'b1,opcode0[7:4]}]) * $signed(r[{1'b1, opcode0[3:0]}]);
-				MULSU: 	RALU16 = $signed(r[{1'b1,opcode0[7:4]}]) * $unsigned(r[{1'b1, opcode0[3:0]}]);				
+				MULSU: 	RALU16 = $signed(r[{2'b10,opcode0[6:4]}]) * $unsigned(r[{2'b10, opcode0[2:0]}]);				
 				NEG: 		RALU =  8'h00 - r[(opcode0[8:4])];
 				OR:  		RALU = r[(opcode0[8:4])] | r[{opcode0[9],opcode0[3:0]}];
 				ORI:  	RALU = r[{1'b1, opcode0[7:4]}] | {opcode0[11:8],opcode0[3:0]};
@@ -1114,7 +1128,14 @@ begin
 				CP:  RALU = r[(opcode0[8:4])] - r[{opcode0[9],opcode0[3:0]}];
 				SUBI: begin RALU = r[{1'b1, opcode0[7:4]}] - {opcode0[11:8],opcode0[3:0]}; operand = {opcode0[11:8],opcode0[3:0]}; end 
 				SWAP: RALU = {r[(opcode0[8:4])][3:0],r[(opcode0[8:4])][7:4]};
-				default: begin RALU = 0; RALU16 = 0; operand = 0; end
+`ifdef c_fmul
+				FMUL: 
+					begin  
+						RALU17[16] = r[{2'b10,opcode0[6:4]}][7] * r[{2'b10, opcode0[2:0]}][7];	
+						RALU17[15:0] = r[{2'b10,opcode0[6:4]}][6:0] * r[{2'b10, opcode0[2:0]}][6:0];
+					end
+`endif
+				default: begin RALU = 0; RALU16 = 0; operand = 0; `ifdef c_fmul RALU17 = 0; `endif end
 			endcase
 		end
 end
