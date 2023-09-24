@@ -80,8 +80,8 @@ localparam aTWSR = 8'h01;
 localparam aTWBR = 8'h00;
 //------------------------------INTERRUPTS-------------------------------
 
-`define ATMEGA16_32
-//`define ATMEGA8
+//`define ATMEGA16_32
+`define ATMEGA8
 
 /*
 Vector No. | Program Address | Source Interrupt Definition
