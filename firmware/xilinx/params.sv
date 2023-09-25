@@ -5,9 +5,10 @@
 `define ADIWRr {2'b11, opcode0[5:4], 1'b0}
 `define ADIWRd {2'b11, opcode0[5:4], 1'b1}
 
+
 //Parameters
-parameter FSIZE = 4096;
-parameter RSIZE = 1024;
+parameter FSIZE = 16384;
+parameter RSIZE = 2048;
 //Settings
 parameter ROM_ADD_WIDTH = $clog2(FSIZE) - 1;
 parameter RAM_ADD_WIDTH = $clog2(RSIZE) - 1;
@@ -78,6 +79,9 @@ parameter STZPM = 8'h3E; //+
 parameter SUB	= 8'h3F; //+
 parameter SUBI	= 8'h40; //+
 parameter SWAP	= 8'h41; //+
+parameter FMUL	= 8'h42;
+parameter FMULS	= 8'h43;
+parameter FMULSU	= 8'h44;
 
 //Obrabotchik
 parameter in_c = 1;
@@ -123,7 +127,7 @@ localparam	SPH	= 8'h3E;
 `define c_brbsc
 `define c_bset
 `define c_bst
-//`define c_call
+`define c_call
 `define c_csbi
 `define c_com
 `define c_cp
@@ -132,11 +136,12 @@ localparam	SPH	= 8'h3E;
 `define c_cpse
 `define c_dec
 `define c_eor
+//`define c_fmul
 `define c_icall
 `define c_ijmp
 `define c_in
 `define c_inc
-//`define c_jmp
+`define c_jmp
 `define c_ldi
 `define c_lddpq
 `define c_lds
@@ -180,7 +185,5 @@ localparam	SPH	= 8'h3E;
 
 //Interrupts ENABLE-DISABLE
 `define irq_enable
-
-
 
 
