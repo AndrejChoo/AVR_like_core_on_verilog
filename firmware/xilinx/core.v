@@ -11,7 +11,12 @@ output wire[7:0]SREG,
 output wire[15:0]SP,
 //INTERRUPTS
 input wire IRQ_REQ,
-input wire[3:0]IRQ_ADD,
+input wire[5:0]IRQ_ADD,
+//PROGGER
+input wire[15:0]PROGDI,
+input wire[ROM_ADD_WIDTH:0]PROGADD,
+input wire PROG_CLK,
+input wire PROG_WE,
 //DEBUG
 output wire[15:0]PCNT,
 output wire[6:0]ONUM
@@ -53,7 +58,7 @@ reg ram_ck0, ram_ck1;
 wire hclk;
 wire[15:0]opcode0,opcode1;
 wire[ROM_ADD_WIDTH:0]rom_add1;
-wire rrd;
+wire rrd,rrd1,romwe;
 wire[7:0] RAM_DOUT0, RAM_DOUT1;
 //Two words command
 wire comm_width;
@@ -61,8 +66,10 @@ wire comm_width;
 
 //Assignations
 assign hclk = clk;
-assign rom_add1 = (PC + 1);
+assign rom_add1 = (rst)? (PC + 1) : PROGADD;
 assign rrd = (state == 0)? (hclk & rst) : 1'b0;
+assign rrd1 = (rst)? rrd : PROG_CLK;
+assign romwe = (rst)? 1'b0 : PROG_WE;
 assign IOCNT = iocnt;
 assign IODOUT = iodout;
 assign SREG = sreg;
@@ -99,15 +106,11 @@ begin
 end
 
 /*
-ROM mr0(.q_a({opcode0[7:0],opcode0[15:8]}),.q_b({opcode1[7:0],opcode1[15:8]}),.address_a(PC),
-			.address_b(rom_add1),.clock_a(rrd),.clock_b(rrd));
-
-RAM ms0(.address_a(ram_add0[RAM_ADD_WIDTH:0]),.address_b(ram_add1[RAM_ADD_WIDTH:0]),.clock_a(~ram_ck0),.clock_b(~ram_ck1),
-			.wren_a(ram_we0),.wren_b(ram_we1),.data_a(ram_din0),.data_b(ram_din1),.q_a(RAM_DOUT0),.q_b(RAM_DOUT1));
-*/
-
 IROM mro0(.addra(PC),.addrb(rom_add1),.douta({opcode0[7:0],opcode0[15:8]}),.doutb({opcode1[7:0],opcode1[15:8]}),
 		  .clka(rrd),.clkb(rrd));
+*/
+SROM mro0(.addra(PC),.addrb(rom_add1),.clka(rrd),.clkb(rrd1),.dina(16'hFFFF),.dinb(PROGDI),
+			 .douta({opcode0[7:0],opcode0[15:8]}),.doutb({opcode1[7:0],opcode1[15:8]}),.wea(1'b0),.web(romwe));
 		  
 SRAM mra0(.addra(ram_add0[RAM_ADD_WIDTH:0]),.addrb(ram_add1[RAM_ADD_WIDTH:0]),.clka(ram_ck0),.clkb(ram_ck1),
 			.dina(ram_din0),.dinb(ram_din1),.douta(RAM_DOUT0),.doutb(RAM_DOUT1),.wea(ram_we0),.web(ram_we1));
@@ -450,6 +453,17 @@ begin
 									sreg[SREG_S] <= 1'b0 ^ RALU[7];									
 									PC <= PC + 1;
 								end
+`endif
+`ifdef c_fmul
+							FMUL:
+								begin
+									r[1] <= RALU17[15:8];
+									r[0] <= RALU17[7:0];
+									sreg[SREG_C] <= RALU17[16];
+									sreg[SREG_Z] <= (RALU17[15:0] == 16'h0000)? 1'b1 : 1'b0;
+									PC <= PC + 1;
+								end
+
 `endif
 `ifdef c_icall								
 							ICALL:
@@ -963,108 +977,109 @@ begin
 end
 
 //Decoder opcodov
-always@(opcode0)
+always@(*)
 	begin
 		case(opcode0[15:12])
 			4'h0:
 				begin
-					if(opcode0[11:0] == 12'd0) o_num <= NOP;
-					if(opcode0[11:10] == 2'b11) o_num <= ADD;
-					if(opcode0[11:10] == 2'b01) o_num <= CPC;
-					if(opcode0[11:10] == 2'b10) o_num <= SBC;
-					if(opcode0[11:8] == 4'b0001) o_num <= MOVW;
-					if(opcode0[11:8] == 4'b0010) o_num <= MULS;
-					if(opcode0[11:8] == 4'b0011) o_num <= MULSU;
+					if(opcode0[11:0] == 12'd0) o_num = NOP;
+					if(opcode0[11:10] == 2'b11) o_num = ADD;
+					if(opcode0[11:10] == 2'b01) o_num = CPC;
+					if(opcode0[11:10] == 2'b10) o_num = SBC;
+					if(opcode0[11:8] == 4'b0001) o_num = MOVW;
+					if(opcode0[11:8] == 4'b0010) o_num = MULS;
+					if({opcode0[11:7],opcode0[3]} == 6'b001100) o_num = MULSU;
+					if({opcode0[11:7],opcode0[3]} == 6'b001101) o_num = FMUL;
+					if({opcode0[11:7],opcode0[3]} == 6'b001110) o_num = FMULS;
+					if({opcode0[11:7],opcode0[3]} == 6'b001111) o_num = FMULSU;
 				end
 			4'h1:
 				begin
-					if(opcode0[11:10] == 2'b11) o_num <= ADC;
-					if(opcode0[11:10] == 2'b01) o_num <= CP;
-					if(opcode0[11:10] == 2'b10) o_num <= SUB;
-					if(opcode0[11:10] == 2'b00) o_num <= CPSE;
+					if(opcode0[11:10] == 2'b11) o_num = ADC;
+					if(opcode0[11:10] == 2'b01) o_num = CP;
+					if(opcode0[11:10] == 2'b10) o_num = SUB;
+					if(opcode0[11:10] == 2'b00) o_num = CPSE;
 				end
 			4'h2:
 				begin
-					if(opcode0[11:10] == 2'b00) o_num <= AND;
-					if(opcode0[11:10] == 2'b10) o_num <= OR;
-					if(opcode0[11:10] == 2'b01) o_num <= EOR;
-					if(opcode0[11:10] == 2'b11) o_num <= MOV;
+					if(opcode0[11:10] == 2'b00) o_num = AND;
+					if(opcode0[11:10] == 2'b10) o_num = OR;
+					if(opcode0[11:10] == 2'b01) o_num = EOR;
+					if(opcode0[11:10] == 2'b11) o_num = MOV;
 				end
-			4'h3: o_num <= CPI;
-			4'h4: o_num <= SBCI;
-			4'h5: o_num <= SUBI;
-			4'h6: o_num <= ORI;
-			4'h7: o_num <= ANDI;
+			4'h3: o_num = CPI;
+			4'h4: o_num = SBCI;
+			4'h5: o_num = SUBI;
+			4'h6: o_num = ORI;
+			4'h7: o_num = ANDI;
 			4'h8:
 				begin
-					//if({opcode0[11:9],opcode0[2:0]} == 6'b000000) o_num <= LDYZ; //LDDY - LDDZ
-					//if({opcode0[11:9],opcode0[2:0]} == 6'b001000) o_num <= STYZ; //STDY - STDZ
-					if(opcode0[9] == 1'b1) o_num <= STYZ; //STDYPQ - STDZPQ
-					if(opcode0[9] == 1'b0) o_num <= LDYZ; //LDDYPQ - LDDZPQ
+					if(opcode0[9] == 1'b1) o_num = STYZ; //STDYPQ - STDZPQ - STYZ
+					if(opcode0[9] == 1'b0) o_num = LDYZ; //LDDYPQ - LDDZPQ - LDYZ
 				end
 			4'h9:
 				begin
-					if(opcode0[11:10] == 2'b11) o_num <= MUL;
-					if({opcode0[11:9],opcode0[3:1]} == 6'b010110) o_num <= JMP;
-					if({opcode0[11:9],opcode0[3:1]} == 6'b010111) o_num <= CALL;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0100011) o_num <= INC;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0101010) o_num <= DEC;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0100101) o_num <= ASR;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0100000) o_num <= COM;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0100110) o_num <= LSR;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0100001) o_num <= NEG;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0100111) o_num <= ROR;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0100010) o_num <= SWAP;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0011111) o_num <= PUSH;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0001111) o_num <= POP;
-					if(opcode0[11:0] == 12'h409) o_num <= IJMP;
-					if(opcode0[11:0] == 12'h508) o_num <= RET;
-					if(opcode0[11:0] == 12'h509) o_num <= ICALL;
-					if(opcode0[11:0] == 12'h5C8) o_num <= LPM;
-					if(opcode0[11:0] == 12'h518) o_num <= RETI;
-					if(opcode0[11:8] == 4'b0110) o_num <= ADIW;
-					if(opcode0[11:8] == 4'b0111) o_num <= SBIW;
-					if({opcode0[11:8],opcode0[3:0]} == 8'b01001000) o_num <= BSET;  //BSET - BCLR
-					if({opcode0[11:10],opcode0[8]} == 3'b100) o_num <= CSBI; //CBI - SBI
-					if({opcode0[11:10],opcode0[8]} == 3'b101) o_num <= SBICS; 		//SBIC - SBIS
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0000000) o_num <= LDS; 
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0010000) o_num <= STS; 
-					if({opcode0[11:9],opcode0[3:1]} == 6'b000010) o_num <= LPMZ; 
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0001100) o_num <= LDX;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0001101) o_num <= LDX;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0001110) o_num <= LDX;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0001001) o_num <= LDYPM;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0001010) o_num <= LDYPM;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0000001) o_num <= LDZPM;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0000010) o_num <= LDZPM;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0011100) o_num <= STX;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0011101) o_num <= STX;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0011110) o_num <= STX;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0011001) o_num <= STYPM;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0011010) o_num <= STYPM;
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0010001) o_num <= STZPM;	
-					if({opcode0[11:9],opcode0[3:0]} == 7'b0010010) o_num <= STZPM;	
+					if(opcode0[11:10] == 2'b11) o_num = MUL;
+					if({opcode0[11:9],opcode0[3:1]} == 6'b010110) o_num = JMP;
+					if({opcode0[11:9],opcode0[3:1]} == 6'b010111) o_num = CALL;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0100011) o_num = INC;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0101010) o_num = DEC;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0100101) o_num = ASR;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0100000) o_num = COM;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0100110) o_num = LSR;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0100001) o_num = NEG;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0100111) o_num = ROR;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0100010) o_num = SWAP;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0011111) o_num = PUSH;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0001111) o_num = POP;
+					if(opcode0[11:0] == 12'h409) o_num = IJMP;
+					if(opcode0[11:0] == 12'h508) o_num = RET;
+					if(opcode0[11:0] == 12'h509) o_num = ICALL;
+					if(opcode0[11:0] == 12'h5C8) o_num = LPM;
+					if(opcode0[11:0] == 12'h518) o_num = RETI;
+					if(opcode0[11:8] == 4'b0110) o_num = ADIW;
+					if(opcode0[11:8] == 4'b0111) o_num = SBIW;
+					if({opcode0[11:8],opcode0[3:0]} == 8'b01001000) o_num = BSET;  //BSET - BCLR
+					if({opcode0[11:10],opcode0[8]} == 3'b100) o_num = CSBI; //CBI - SBI
+					if({opcode0[11:10],opcode0[8]} == 3'b101) o_num = SBICS; 		//SBIC - SBIS
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0000000) o_num = LDS; 
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0010000) o_num = STS; 
+					if({opcode0[11:9],opcode0[3:1]} == 6'b000010) o_num = LPMZ; 
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0001100) o_num = LDX;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0001101) o_num = LDX;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0001110) o_num = LDX;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0001001) o_num = LDYPM;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0001010) o_num = LDYPM;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0000001) o_num = LDZPM;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0000010) o_num = LDZPM;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0011100) o_num = STX;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0011101) o_num = STX;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0011110) o_num = STX;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0011001) o_num = STYPM;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0011010) o_num = STYPM;
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0010001) o_num = STZPM;	
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0010010) o_num = STZPM;	
 				end
 			4'hA:
 				begin
-					if(opcode0[9] == 1'b1) o_num <= STYZ;
-					if(opcode0[9] == 1'b0) o_num <= LDYZ;
+					if(opcode0[9] == 1'b1) o_num = STYZ;
+					if(opcode0[9] == 1'b0) o_num = LDYZ;
 				end
 			4'hB:
 				begin
-					if(opcode0[11]== 0) o_num <= IN;
-					if(opcode0[11]== 1) o_num <= OUT;
+					if(opcode0[11]== 0) o_num = IN;
+					if(opcode0[11]== 1) o_num = OUT;
 				end
-			4'hC: o_num <= RJMP;
-			4'hD: o_num <= RCALL;
-			4'hE: o_num <= LDI;
+			4'hC: o_num = RJMP;
+			4'hD: o_num = RCALL;
+			4'hE: o_num = LDI;
 			4'hF:
 				begin
-					if(opcode0[11]== 1'b0) o_num <= BRBSC; //BRBC - BRBS
-					if({opcode0[11:9],opcode0[3]}== 4'b1000) o_num <= BLD;
-					if({opcode0[11:9],opcode0[3]}== 4'b1010) o_num <= BST;
-					if({opcode0[11:10],opcode0[3]}== 3'b110) o_num <= SBRSC; //SBRC - SBRS
-					if(opcode0[11:0] == 12'hFFF) o_num <= 0;
+					if(opcode0[11]== 1'b0) o_num = BRBSC; //BRBC - BRBS
+					if({opcode0[11:9],opcode0[3]}== 4'b1000) o_num = BLD;
+					if({opcode0[11:9],opcode0[3]}== 4'b1010) o_num = BST;
+					if({opcode0[11:10],opcode0[3]}== 3'b110) o_num = SBRSC; //SBRC - SBRS
+					if(opcode0[11:0] == 12'hFFF) o_num = 0;
 				end
 		endcase
 	end
@@ -1097,20 +1112,29 @@ begin
 				EOR: 		RALU = r[(opcode0[8:4])] ^ r[{opcode0[9],opcode0[3:0]}];
 				INC: 		RALU = r[(opcode0[8:4])] + 1'b1;
 				LSR: 		RALU =  {1'b0, r[(opcode0[8:4])][7:1]};
-				MUL:  	RALU16 = r[(opcode0[8:4])]*r[{opcode0[9], opcode0[3:0]}];
+				MUL:  	RALU16 = $unsigned(r[(opcode0[8:4])]) * $unsigned(r[{opcode0[9], opcode0[3:0]}]);
 				MULS: 	RALU16 = $signed(r[{1'b1,opcode0[7:4]}]) * $signed(r[{1'b1, opcode0[3:0]}]);
-				MULSU: 	RALU16 = $signed(r[{1'b1,opcode0[7:4]}]) * $unsigned(r[{1'b1, opcode0[3:0]}]);				
+				MULSU: 	RALU16 = $signed(r[{2'b10,opcode0[6:4]}]) * $unsigned(r[{2'b10, opcode0[2:0]}]);				
 				NEG: 		RALU =  8'h00 - r[(opcode0[8:4])];
 				OR:  		RALU = r[(opcode0[8:4])] | r[{opcode0[9],opcode0[3:0]}];
 				ORI:  	RALU = r[{1'b1, opcode0[7:4]}] | {opcode0[11:8],opcode0[3:0]};
 				ROR: 		RALU = {sreg[SREG_C], r[(opcode0[8:4])][7:1]};			
-				SBC,CPC: RALU = r[(opcode0[8:4])] - r[{opcode0[9],opcode0[3:0]}] - sreg[SREG_C];
+				SBC: RALU = r[(opcode0[8:4])] - r[{opcode0[9],opcode0[3:0]}] - sreg[SREG_C];
+				CPC: RALU = r[(opcode0[8:4])] - r[{opcode0[9],opcode0[3:0]}] - sreg[SREG_C];
 				SBCI: 	begin RALU = r[{1'b1, opcode0[7:4]}] - {opcode0[11:8],opcode0[3:0]} - sreg[SREG_C]; operand = {opcode0[11:8],opcode0[3:0]}; end 
 				SBIW: RALU16 = {r[{2'b11, opcode0[5:4], 1'b1}],r[{2'b11, opcode0[5:4], 1'b0}]} - {opcode0[7:6],opcode0[3:0]};
-				SUB,CP:  RALU = r[(opcode0[8:4])] - r[{opcode0[9],opcode0[3:0]}];
+				SUB:  RALU = r[(opcode0[8:4])] - r[{opcode0[9],opcode0[3:0]}];
+				CP:  RALU = r[(opcode0[8:4])] - r[{opcode0[9],opcode0[3:0]}];
 				SUBI: begin RALU = r[{1'b1, opcode0[7:4]}] - {opcode0[11:8],opcode0[3:0]}; operand = {opcode0[11:8],opcode0[3:0]}; end 
 				SWAP: RALU = {r[(opcode0[8:4])][3:0],r[(opcode0[8:4])][7:4]};
-				default: begin RALU = 0; RALU16 = 0; operand = 0; end
+`ifdef c_fmul
+				FMUL: 
+					begin  
+						RALU17[16] = r[{2'b10,opcode0[6:4]}][7] * r[{2'b10, opcode0[2:0]}][7];	
+						RALU17[15:0] = r[{2'b10,opcode0[6:4]}][6:0] * r[{2'b10, opcode0[2:0]}][6:0];
+					end
+`endif
+				default: begin RALU = 0; RALU16 = 0; operand = 0; `ifdef c_fmul RALU17 = 0; `endif end
 			endcase
 		end
 end
