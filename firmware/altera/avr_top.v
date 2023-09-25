@@ -56,7 +56,11 @@ wire PROGCLK, PROGWE;
 
 //IN CLOCK DIVIDER /2 /4
 reg[22:0]div;
-always@(posedge clk) div <= div + 1;
+always@(posedge clk or negedge rst) 
+begin
+	if(!rst) div <= 0;
+	else div <= div + 1;
+end
 
 //Interconnections
 core cpu0(.clk(hclk),.rst(rst),.SREG(SREG),.IOCNT(IOCNT),.IODOUT(IODOUT),.IODIN(IODIN),.IOW(IOW),.IOR(IOR),.SP(SP),//
