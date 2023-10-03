@@ -1044,7 +1044,8 @@ always@(*)
 					if({opcode0[11:10],opcode0[8]} == 3'b101) o_num = SBICS; 		//SBIC - SBIS
 					if({opcode0[11:9],opcode0[3:0]} == 7'b0000000) o_num = LDS; 
 					if({opcode0[11:9],opcode0[3:0]} == 7'b0010000) o_num = STS; 
-					if({opcode0[11:9],opcode0[3:1]} == 6'b000010) o_num = LPMZ; 
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0000100) o_num = LPMZ; //LPMZ
+					if({opcode0[11:9],opcode0[3:0]} == 7'b0000101) o_num = LPMZ; //LPMZ+ 
 					if({opcode0[11:9],opcode0[3:0]} == 7'b0001100) o_num = LDX;
 					if({opcode0[11:9],opcode0[3:0]} == 7'b0001101) o_num = LDX;
 					if({opcode0[11:9],opcode0[3:0]} == 7'b0001110) o_num = LDX;
